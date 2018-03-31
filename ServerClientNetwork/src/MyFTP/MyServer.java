@@ -29,6 +29,7 @@ public class MyServer extends Socket
 
 	// VARIABLES
 	private int packetsize = 1000;
+	private static String command = null;
 
 	public MyServer(int port)
 	{
@@ -59,26 +60,24 @@ public class MyServer extends Socket
 			{
 				if ((message = br.readLine()) != null)
 				{
+					if(message.startsWith("send"))
+					{
+						command = message;
+						bw.write("end\n");
+						bw.flush();
+						break;
+					}
 					System.out
 							.println("SERVER: Client said \"" + message + "\"");
 				}
-
-				message = scanner.nextLine();
-				bw.write(message + "\n");
-				bw.flush();
-
 				if (message.equals("end"))
 				{
 					break;
 				}
+				message = scanner.nextLine();
+				bw.write(message + "\n");
+				bw.flush();
 			}
-
-			bw.close();
-			br.close();
-			osw.close();
-			isr.close();
-			os.close();
-			is.close();
 			return;
 		} catch (IOException e)
 		{
@@ -103,6 +102,10 @@ public class MyServer extends Socket
 						+ server.getRemoteSocketAddress());
 				testserver.messageexchange();
 				System.out.println("SERVER: back in main");
+				if(command!=null)
+				{
+					System.out.println("Got command to "+command);
+				}
 			} catch (IOException e)
 			{
 				e.printStackTrace();
