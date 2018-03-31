@@ -26,6 +26,7 @@ public class MyClient extends Socket
 
 	// VARIABLES
 	private int packetsize = 1000;
+	private static String command = null;
 
 	public MyClient(String serveraddress, int port)
 	{
@@ -42,7 +43,7 @@ public class MyClient extends Socket
 		}
 	}
 
-	public void messageexchange()
+	public void messageexchange() 
 	{
 		try
 		{
@@ -61,21 +62,21 @@ public class MyClient extends Socket
 				bw.flush();
 				if ((message = br.readLine()) != null)
 				{
+					if(message.startsWith("send"))
+					{
+						command  = message;
+						bw.write("end\n");
+						bw.flush();
+						break;
+					}
 					System.out
 							.println("CLIENT: Server said \"" + message + "\"");
 				}
-				if (message.equals("end"))
+				if (message.equals("end")) 
 				{
 					break;
 				}
 			}
-
-			bw.close();
-			br.close();
-			osw.close();
-			isr.close();
-			os.close();
-			is.close();
 			return;
 		} catch (IOException e)
 		{
@@ -100,9 +101,13 @@ public class MyClient extends Socket
 		port = Integer.parseInt(scanner.nextLine());
 
 		MyClient testclient = new MyClient(serveraddress, port);
-
+		
 		testclient.messageexchange();
 		System.out.println("CLIENT: back in main");
-
+		if(command!=null)
+		{
+			System.out.println("Got command to "+command);
+			return;
+		}
 	}
 }
