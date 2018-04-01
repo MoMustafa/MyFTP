@@ -83,7 +83,8 @@ public class MyServer extends Socket
 				message = scanner.nextLine();
 				if (message.startsWith("send"))
 				{
-					command = "receive";
+					String filename = (message.split(" ",2))[1];
+					command = "receive "+filename;
 				}
 				bw.write(message + "\n");
 				bw.flush();
@@ -150,12 +151,12 @@ public class MyServer extends Socket
 
 	}
 
-	public void receivefile()
+	public void receivefile(String filename)
 	{
 		try
 		{
 			byte[] contents = new byte[packetsize];
-			FileOutputStream fout = new FileOutputStream("received.jpg");
+			FileOutputStream fout = new FileOutputStream("received "+filename);
 			BufferedOutputStream bout = new BufferedOutputStream(fout);
 			InputStream is = server.getInputStream();
 
@@ -199,7 +200,7 @@ public class MyServer extends Socket
 					if((commandarr[0]).equals("receive"))
 					{
 						System.out.println("SERVER: Going to receive file.");
-						testserver.receivefile();
+						testserver.receivefile(commandarr[1]);
 					}
 					if ((commandarr[0]).equals("send"))
 					{
