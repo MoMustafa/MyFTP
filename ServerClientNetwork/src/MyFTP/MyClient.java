@@ -49,7 +49,7 @@ public class MyClient extends Socket
 		}
 	}
 
-	public void messageexchange()
+	private void messageexchange()
 	{
 		try
 		{
@@ -66,11 +66,15 @@ public class MyClient extends Socket
 				message = scanner.nextLine();
 				if (message.startsWith("send"))
 				{
-					String filename = (message.split(" ",2))[1];
-					command = "receive "+filename;
+					String filename = (message.split(" ", 2))[1];
+					command = "receive " + filename;
 				}
 				bw.write(message + "\n");
 				bw.flush();
+				if (message.equals("end"))
+				{
+					break;
+				}
 				if ((message = br.readLine()) != null)
 				{
 					if (message.startsWith("send"))
@@ -82,10 +86,10 @@ public class MyClient extends Socket
 					}
 					System.out
 							.println("CLIENT: Server said \"" + message + "\"");
-				}
-				if (message.equals("end"))
-				{
-					break;
+					if (message.equals("end"))
+					{
+						break;
+					}
 				}
 			}
 			return;
@@ -95,73 +99,92 @@ public class MyClient extends Socket
 		}
 	}
 
-	public void sendfile(String filename)
+	private void sendfile(String filename)
 	{
 		System.out.println("SERVER: Sending " + filename);
 		try
 		{
+			String message = null;
+			is = client.getInputStream();
+			isr = new InputStreamReader(is);
+			br = new BufferedReader(isr);
+			os = client.getOutputStream();
+			osw = new OutputStreamWriter(os);
+			bw = new BufferedWriter(osw);
+
 			File file = new File(filename);
 			if (!file.exists())
 			{
-				System.out.println("File does not exist)");
-				OutputStream out = client.getOutputStream();
-				OutputStreamWriter ow = new OutputStreamWriter(out);
-				BufferedWriter bw = new BufferedWriter(ow);
+				System.out.println("CLIENT: " + filename + " does not exist.");
 				bw.write(filename + " does not exist.");
 				bw.flush();
 				return;
 			}
 			FileInputStream fin = new FileInputStream(file);
 			BufferedInputStream bin = new BufferedInputStream(fin);
-			OutputStream os = client.getOutputStream();
+			OutputStream fout = client.getOutputStream();
 
 			byte[] packet;
 			long filelen = file.length();
 			long sequence = 0;
 
-			while (sequence != filelen)
+			do
 			{
-				int size = packetsize;
-				if (filelen - sequence >= size)
+				while (sequence != filelen)
 				{
-					sequence += size;
+					int size = packetsize;
+					if (filelen - sequence >= size)
+					{
+						sequence += size;
+					}
+					else
+					{
+						size = (int) (filelen - sequence);
+						sequence = filelen;
+					}
+					packet = new byte[size];
+					bin.read(packet, 0, size);
+					fout.write(packet);
+					if ((message = br.readLine()) != null)
+					{
+						System.out.println(
+								"CLIENT: From Server \"" + message + "\"");
+					}
 				}
-				else
-				{
-					size = (int) (filelen - sequence);
-					sequence = filelen;
-				}
-				packet = new byte[size];
-				bin.read(packet, 0, size);
-				os.write(packet);
-				System.out.println("SERVER: ACK #" + sequence);
-			}
+			}while(sequence!=filelen);
 			os.flush();
 			client.close();
 			bin.close();
 		} catch (IOException e)
 		{
 			e.printStackTrace();
-			return;
 		}
 		System.out.println(filename + " Sent Successfully to "
 				+ client.getRemoteSocketAddress());
 	}
 
-	public void receivefile(String filename)
+	private void receivefile(String filename)
 	{
 		try
 		{
+			os = client.getOutputStream();
+			osw = new OutputStreamWriter(os);
+			bw = new BufferedWriter(osw);
+			
 			byte[] contents = new byte[packetsize];
-			FileOutputStream fout = new FileOutputStream("received "+filename);
+			FileOutputStream fout = new FileOutputStream(
+					"received " + filename);
 			BufferedOutputStream bout = new BufferedOutputStream(fout);
 			InputStream is = client.getInputStream();
-
+			
 			int bytesRead = 0;
 
 			while ((bytesRead = is.read(contents)) != -1)
+			{
 				bout.write(contents, 0, bytesRead);
-
+				bw.write("ACK#"+bytesRead+"\n");
+				bw.flush();
+			}
 			bout.flush();
 			client.close();
 
@@ -172,7 +195,7 @@ public class MyClient extends Socket
 			e.printStackTrace();
 		}
 	}
-	
+
 	public static void main(String args[])
 	{
 		int port;
@@ -191,12 +214,12 @@ public class MyClient extends Socket
 		if (command != null)
 		{
 			commandarr = command.split(" ", 2);
-			if((commandarr[0]).equals("receive"))
+			if ((commandarr[0]).equals("receive"))
 			{
 				System.out.println("CLIENT: Going to receive file.");
 				testclient.receivefile(commandarr[1]);
 			}
-			if((commandarr[0]).equals("send"))
+			if ((commandarr[0]).equals("send"))
 			{
 				System.out.println("CLIENT: Got command to " + command);
 				testclient.sendfile(commandarr[1]);
@@ -204,5 +227,6 @@ public class MyClient extends Socket
 			}
 			return;
 		}
+		
 	}
 }
