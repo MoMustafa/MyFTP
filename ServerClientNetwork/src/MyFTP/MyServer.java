@@ -10,6 +10,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
@@ -102,64 +104,25 @@ public class MyServer extends Socket
 
 	public void sendfile(String filename)
 	{
-		System.out.println("SERVER: Sending " + filename);
 		try
 		{
-			String message = null;
-			is = server.getInputStream();
-			isr = new InputStreamReader(is);
-			br = new BufferedReader(isr);
-			os = server.getOutputStream();
-			osw = new OutputStreamWriter(os);
-			bw = new BufferedWriter(osw);
-
+			System.out.println("SERVER: Sending " + filename);
 			File file = new File(filename);
-			if (!file.exists())
-			{
-				System.out.println("SERVER: " + filename + " does not exist.");
-				bw.write(filename + " does not exist.");
-				bw.flush();
-				return;
-			}
+			byte[] packet = new byte[(int) file.length()];
 			FileInputStream fin = new FileInputStream(file);
 			BufferedInputStream bin = new BufferedInputStream(fin);
-			OutputStream fout = server.getOutputStream();
-
-			byte[] packet;
-			long filelen = file.length();
-			long sequence = 0;
-
-			do
-			{
-				while (sequence != filelen)
-				{
-					int size = packetsize;
-					if (filelen - sequence >= size)
-					{
-						sequence += size;
-					}
-					else
-					{
-						size = (int) (filelen - sequence);
-						sequence = filelen;
-					}
-					packet = new byte[size];
-					bin.read(packet, 0, size);
-					fout.write(packet);
-					if ((message = br.readLine()) != null)
-					{
-						System.out.println(
-								"SERVER: From Client \"" + message + "\"");
-					}
-				}
-			}while(sequence!=filelen);
-			os.flush();
-			server.close();
-			bin.close();
+			bin.read(packet, 0, (int) file.length());
+			ObjectInputStream inputStream = null;
+			ObjectOutputStream oout = new ObjectOutputStream(
+					server.getOutputStream());
+			header sendobject = new header(packet, 0);
+			oout.writeObject(sendobject);
+			oout.close();
 		} catch (IOException e)
 		{
 			e.printStackTrace();
 		}
+
 		System.out.println(filename + " Sent Successfully to "
 				+ server.getRemoteSocketAddress());
 	}
@@ -171,19 +134,19 @@ public class MyServer extends Socket
 			os = server.getOutputStream();
 			osw = new OutputStreamWriter(os);
 			bw = new BufferedWriter(osw);
-			
+
 			byte[] contents = new byte[packetsize];
 			FileOutputStream fout = new FileOutputStream(
 					"received " + filename);
 			BufferedOutputStream bout = new BufferedOutputStream(fout);
 			InputStream is = server.getInputStream();
-			
+
 			int bytesRead = 0;
 
 			while ((bytesRead = is.read(contents)) != -1)
 			{
 				bout.write(contents, 0, bytesRead);
-				bw.write("ACK#"+bytesRead+"\n");
+				bw.write("ACK#" + bytesRead + "\n");
 				bw.flush();
 			}
 			bout.flush();
