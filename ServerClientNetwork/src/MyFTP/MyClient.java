@@ -10,10 +10,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.util.Scanner;
+
 
 public class MyClient extends Socket
 {
@@ -24,7 +26,7 @@ public class MyClient extends Socket
 	static InputStream is;
 	static InputStreamReader isr;
 	static OutputStream os;
-	static OutputStreamWriter osw;
+	static OutputStreamWriter osw; 
 	static BufferedReader br;
 	static BufferedWriter bw;
 	static Scanner scanner;
@@ -33,7 +35,7 @@ public class MyClient extends Socket
 	private int packetsize = 1000;
 	private static String command = null;
 	private static String[] commandarr = null;
-
+	
 	public MyClient(String serveraddress, int port)
 	{
 		try
@@ -126,7 +128,7 @@ public class MyClient extends Socket
 
 			byte[] packet;
 			long filelen = file.length();
-			long sequence = 0;
+			long sequence = 0; //Change to a random number generator
 
 			do
 			{
@@ -167,33 +169,24 @@ public class MyClient extends Socket
 	{
 		try
 		{
-			os = client.getOutputStream();
-			osw = new OutputStreamWriter(os);
-			bw = new BufferedWriter(osw);
-			
-			byte[] contents = new byte[packetsize];
+			ObjectInputStream oin = new ObjectInputStream(client.getInputStream());
+			header receivedobject = (header)oin.readObject();
 			FileOutputStream fout = new FileOutputStream(
 					"received " + filename);
 			BufferedOutputStream bout = new BufferedOutputStream(fout);
-			InputStream is = client.getInputStream();
-			
-			int bytesRead = 0;
-
-			while ((bytesRead = is.read(contents)) != -1)
-			{
-				bout.write(contents, 0, bytesRead);
-				bw.write("ACK#"+bytesRead+"\n");
-				bw.flush();
-			}
+			bout.write(receivedobject.payload, 0, receivedobject.payload.length );
 			bout.flush();
-			client.close();
-
-			System.out.println("File saved successfully!");
 			bout.close();
+			System.out.println("File saved successfully!");
+			client.close();
 		} catch (IOException e)
 		{
 			e.printStackTrace();
+		} catch (ClassNotFoundException e)
+		{
+			e.printStackTrace();
 		}
+		
 	}
 
 	public static void main(String args[])
