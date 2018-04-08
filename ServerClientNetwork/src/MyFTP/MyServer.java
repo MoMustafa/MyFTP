@@ -10,10 +10,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Random;
 import java.util.Scanner;
 
 public class MyServer extends Socket
@@ -34,7 +37,9 @@ public class MyServer extends Socket
 	private static BufferedInputStream bin;
 	private static FileOutputStream fout;
 	private static BufferedOutputStream bout;
-
+	private static ObjectInputStream ois;
+	private static ObjectOutputStream oos;
+	
 	// VARIABLES
 	private static int port;
 	private static int packetsize = 1000;
@@ -42,14 +47,17 @@ public class MyServer extends Socket
 	private static String filename = null;
 	private static String command = null;
 	private static String[] commandarr = null;
-	private static byte[] contents = null;
 	private static byte[] packet = null;
 	private static long filelen = 0;
 	private long sequence = 0;
+	private long endsequence = 0;
 	private int size = 0;
 	private int bytesRead = 0;
-	private int ack = 0;
-
+	private long ack = 0;
+	private header testheader= null;
+	
+	Random rand = new Random();
+	
 	public MyServer(int port) throws IOException
 	{
 		listener = new ServerSocket(port);
@@ -96,41 +104,46 @@ public class MyServer extends Socket
 
 	public void sendfile(File file) throws IOException
 	{
-		System.out.println("SERVER: Sending " + filename);
-		filelen = file.length();
+		System.out.println("CLIENT: Sending " + filename);
 
-		while (sequence != filelen)
+		filelen = file.length();
+		sequence = (long)rand.nextInt(Integer.SIZE-1)+1;
+		System.out.println(sequence);
+		endsequence = sequence + filelen;
+		
+		while (sequence != endsequence)
 		{
 			size = packetsize;
-			if (filelen - sequence >= size)
+			if (endsequence - sequence >= size)
 			{
 				sequence += size;
 			}
 			else
 			{
-				size = (int) (filelen - sequence);
-				sequence = filelen;
+				size = (int) (endsequence - sequence);
+				sequence = endsequence;
 			}
 			packet = new byte[size];
 			bin.read(packet, 0, size);
-			os.write(packet);
+			testheader = new header(packet, sequence);
+			oos.writeObject(testheader);
 			if ((message = br.readLine()) != null)
 			{
-				System.out.println("SERVER: From Client \"" + message + "\"");
+				System.out.println("CLIENT: From Server \"" + message + "\"");
 			}
 		}
-		System.out.println("\""+filename + "\" Sent Successfully to "
+		System.out.println(filename + " Sent Successfully to "
 				+ server.getRemoteSocketAddress());
+		oos.writeObject(null);
 	}
 
-	public void receivefile() throws IOException
+	public void receivefile() throws IOException, ClassNotFoundException
 	{
-		contents = new byte[packetsize];
-
-		while ((bytesRead = is.read(contents)) != -1)
+		while ((testheader = (header) ois.readObject()) != null)
 		{
-			ack += bytesRead;
-			bout.write(contents, 0, bytesRead);
+			bytesRead = testheader.payload.length;
+			ack = testheader.num;
+			bout.write(testheader.payload, 0, bytesRead);
 			bw.write("ACK#" + ack + "\n");
 			bw.flush();
 		}
@@ -142,7 +155,7 @@ public class MyServer extends Socket
 
 	}
 
-	public static void main(String args[]) throws IOException
+	public static void main(String args[]) throws IOException, ClassNotFoundException
 	{
 		System.out.println("SERVER: Enter Port #:");
 		port = Integer.parseInt(scanner.nextLine());
@@ -162,7 +175,9 @@ public class MyServer extends Socket
 					System.out.println("SERVER: Going to receive file.");
 					fout = new FileOutputStream("received " + filename);
 					bout = new BufferedOutputStream(fout);
+					ois = new ObjectInputStream(is);
 					testserver.receivefile();
+					return;
 				}
 				if ((commandarr[0]).equals("send"))
 				{
@@ -178,6 +193,7 @@ public class MyServer extends Socket
 
 					fin = new FileInputStream(file);
 					bin = new BufferedInputStream(fin);
+					oos = new ObjectOutputStream(os);
 					System.out.println("SERVER: Got command to " + command);
 					testserver.sendfile(file);
 					os.flush();
