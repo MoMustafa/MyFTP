@@ -10,6 +10,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
@@ -33,6 +35,8 @@ public class MyClient extends Socket
 	private static BufferedInputStream bin;
 	private static FileOutputStream fout;
 	private static BufferedOutputStream bout;
+	private static ObjectInputStream ois;
+	private static ObjectOutputStream oos;
 
 	// VARIABLES
 	private int packetsize = 1000;
@@ -42,13 +46,14 @@ public class MyClient extends Socket
 	private static String serveraddress = null;
 	private static String command = null;
 	private static String[] commandarr = null;
-	private static byte[] contents = null;
 	private static byte[] packet = null;
 	private static long filelen = 0;
 	private long sequence = 0;
+	private long endsequence = 0;
 	private int size = 0;
 	private int bytesRead = 0;
-	private int ack = 0;
+	private long ack = 0;
+	private header testheader= null;
 
 	Random rand = new Random();
 
@@ -102,22 +107,25 @@ public class MyClient extends Socket
 		System.out.println("CLIENT: Sending " + filename);
 
 		filelen = file.length();
-
-		while (sequence != filelen)
+		sequence = (long)rand.nextInt(Integer.SIZE-1)+1;
+		endsequence = sequence + filelen;
+		
+		while (sequence != endsequence)
 		{
 			size = packetsize;
-			if (filelen - sequence >= size)
+			if (endsequence - sequence >= size)
 			{
 				sequence += size;
 			}
 			else
 			{
-				size = (int) (filelen - sequence);
-				sequence = filelen;
+				size = (int) (endsequence - sequence);
+				sequence = endsequence;
 			}
 			packet = new byte[size];
 			bin.read(packet, 0, size);
-			os.write(packet);
+			testheader = new header(packet, sequence);
+			oos.writeObject(testheader);
 			if ((message = br.readLine()) != null)
 			{
 				System.out.println("CLIENT: From Server \"" + message + "\"");
@@ -125,16 +133,16 @@ public class MyClient extends Socket
 		}
 		System.out.println(filename + " Sent Successfully to "
 				+ client.getRemoteSocketAddress());
+		oos.writeObject(null);
 	}
 
-	private void receivefile() throws IOException
+	private void receivefile() throws IOException, ClassNotFoundException
 	{
-		contents = new byte[packetsize];
-
-		while ((bytesRead = is.read(contents)) != -1)
+		while ((testheader = (header) ois.readObject()) != null)
 		{
-			ack += bytesRead;
-			bout.write(contents, 0, bytesRead);
+			bytesRead = testheader.payload.length;
+			ack = testheader.num;
+			bout.write(testheader.payload, 0, bytesRead);
 			bw.write("ACK#" + ack + "\n");
 			bw.flush();
 		}
@@ -145,7 +153,7 @@ public class MyClient extends Socket
 		bout.close();
 	}
 
-	public static void main(String args[]) throws IOException
+	public static void main(String args[]) throws IOException, ClassNotFoundException
 	{
 		System.out.println("CLIENT: Enter Server Address:");
 		serveraddress = scanner.nextLine();
@@ -168,7 +176,10 @@ public class MyClient extends Socket
 				System.out.println("CLIENT: Going to receive file.");
 				fout = new FileOutputStream("received " + filename);
 				bout = new BufferedOutputStream(fout);
+				ois = new ObjectInputStream(is);
 				testclient.receivefile();
+				testclient.close();
+				return;
 			}
 			if ((commandarr[0]).equals("send"))
 			{
@@ -185,6 +196,7 @@ public class MyClient extends Socket
 
 				fin = new FileInputStream(file);
 				bin = new BufferedInputStream(fin);
+				oos = new ObjectOutputStream(os);
 				System.out.println("CLIENT: Got command to " + command);
 				testclient.sendfile(file);
 				os.flush();
