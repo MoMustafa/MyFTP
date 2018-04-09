@@ -18,6 +18,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Random;
 import java.util.Scanner;
 
@@ -83,7 +84,7 @@ public class MyServer extends Socket
 		bw = new BufferedWriter(osw);
 	}
 
-	public void messageexchange() throws IOException
+	public void communicate() throws IOException
 	{
 		while (true)
 		{
@@ -144,12 +145,12 @@ public class MyServer extends Socket
 
 			buffer.add(testheader);
 
-			System.out.println("SERVER: Sending packet# " + testheader.num);
+			System.out.println("SERVER: Sending packet #" + testheader.num);
 			oos.writeObject(testheader);
 			if ((message = br.readLine()) != null)
 			{
 				System.out.println(
-						"\t\t\t\t\tSERVER: From Client \"" + message + "\"");
+						"\t\t\t\t\tSERVER: From CLIENT \"" + message + "\"");
 				timeout();
 			}
 		}
@@ -158,7 +159,7 @@ public class MyServer extends Socket
 		oos.writeObject(null);
 		if ((message = br.readLine()) != null)
 		{
-			System.out.println("SERVER: From Client \"" + message + "\"");
+			System.out.println("SERVER: From CLIENT \"" + message + "\"");
 		}
 		buffer.clear();
 	}
@@ -166,45 +167,84 @@ public class MyServer extends Socket
 	public void receivefile()
 			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
 	{
+		int drop = 0;
+		buffer = new ArrayList<header>();
 		while ((testheader = (header) ois.readObject()) != null)
 		{
+			drop++;
+
 			testchecksum = testheader.checksum;
 			bytesRead = testheader.payload.length;
 
-			if (testheader.num + packetsize <= ack || ack == 0)
-				ack = testheader.num + packetsize;
-
-			bout.write(testheader.payload, 0, bytesRead);
-			bw.write("ACK#" + ack + "\n");
+			if (drop != 3)
+			{
+				System.out
+						.println("SERVER: Received packet #" + testheader.num);
+				buffer.add(testheader);
+				Collections.sort(buffer, header.compareheader);
+				if (testheader.num == ack || ack == 0)
+					ack = buffer.get(buffer.size() - 1).num + packetsize;
+				System.out.println(
+						"\t\t\t\t\tSERVER: Sending to CLIENT ACK " + ack);
+			}
+			bw.write("ACK " + ack + "\n");
 			bw.flush();
 		}
 		bout.flush();
+		for (header testheader : buffer)
+		{
+			bout.write(testheader.payload, 0, testheader.payload.length);
+		}
+		bout.close();
+		buffer.clear();
 
 		new ChecksumGen();
 		checksum = ChecksumGen.getChecksum("received " + filename);
 
 		if (checksum.equals(testchecksum))
 		{
-			bw.write("Checksum Matches");
+			bw.write("Checksum matches");
 			bw.flush();
 		}
 		else
 		{
-			bw.write("Checksum Doesn't Match");
+			bw.write("Checksum doesn't match");
 			bw.flush();
 		}
 		server.close();
 		System.out.println(
-				"SERVER: received \"" + filename + "\" saved successfully!");
+				"SERVER: \"received " + filename + "\" saved successfully!");
 		bout.close();
 	}
 
-	public void timeout()
+	public void timeout() throws IOException
 	{
 		if ((System.nanoTime() - starttime) > timeout)
 		{
-			System.out.println("SERVER: TIMEOUT\n");
+			System.out.println("\t\t\tSERVER: TIMEOUT\n");
 			starttime = System.nanoTime();
+
+			commandarr = message.split(" ", 2);
+
+			ack = Long.parseLong(commandarr[1]);
+			if ((ack - testheader.num) < 0)
+			{
+				for (header t : buffer)
+				{
+					if (t.num == ack)
+					{
+						System.out.println(
+								"SERVER: Retransmitting packet # " + ack);
+						oos.writeObject(t);
+						if ((message = br.readLine()) != null)
+						{
+							System.out
+									.println("\t\t\t\t\tSERVER: From CLIENT \""
+											+ message + "\"");
+						}
+					}
+				}
+			}
 		}
 		else
 			return;
@@ -219,8 +259,7 @@ public class MyServer extends Socket
 
 		while (true)
 		{
-			testserver.messageexchange();
-			System.out.println("SERVER: back in main");
+			testserver.communicate();
 			if (command != null)
 			{
 				commandarr = command.split(" ", 2);
