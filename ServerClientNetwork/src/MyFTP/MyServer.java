@@ -44,7 +44,7 @@ public class MyServer extends Socket
 
 	// VARIABLES
 	private static int port;
-	private static int packetsize = 1000;
+	private final int packetsize = 1000;
 	private static String testchecksum = null;
 	private static String checksum = null;
 	private static String message = null;
@@ -58,6 +58,8 @@ public class MyServer extends Socket
 	private int size = 0;
 	private int bytesRead = 0;
 	private long ack = 0;
+	private long starttime = 0;
+	private long timeout = 1000000;
 
 	// CONTAINERS
 	private header testheader = null;
@@ -111,17 +113,18 @@ public class MyServer extends Socket
 
 	public void sendfile(File file) throws IOException, NoSuchAlgorithmException
 	{
-		System.out.println("CLIENT: Sending " + filename);
+		System.out.println("SERVER: Sending " + filename);
 
 		new ChecksumGen();
 		checksum = ChecksumGen.getChecksum(filename);
 
 		filelen = file.length();
 		sequence = (long) rand.nextInt(Integer.SIZE - 1) + 1;
-		System.out.println(sequence);
 		endsequence = sequence + filelen;
 
 		buffer = new ArrayList<header>();
+
+		starttime = System.nanoTime();
 
 		while (sequence != endsequence)
 		{
@@ -138,12 +141,16 @@ public class MyServer extends Socket
 			packet = new byte[size];
 			bin.read(packet, 0, size);
 			testheader = new header(packet, sequence, checksum);
+
+			buffer.add(testheader);
+
 			System.out.println("SERVER: Sending packet# " + testheader.num);
 			oos.writeObject(testheader);
 			if ((message = br.readLine()) != null)
 			{
 				System.out.println(
 						"\t\t\t\t\tSERVER: From Client \"" + message + "\"");
+				timeout();
 			}
 		}
 		System.out.println("SERVER: " + filename + " Sent Successfully to "
@@ -153,6 +160,7 @@ public class MyServer extends Socket
 		{
 			System.out.println("SERVER: From Client \"" + message + "\"");
 		}
+		buffer.clear();
 	}
 
 	public void receivefile()
@@ -162,7 +170,10 @@ public class MyServer extends Socket
 		{
 			testchecksum = testheader.checksum;
 			bytesRead = testheader.payload.length;
-			ack = testheader.num + packetsize;
+
+			if (testheader.num + packetsize <= ack || ack == 0)
+				ack = testheader.num + packetsize;
+
 			bout.write(testheader.payload, 0, bytesRead);
 			bw.write("ACK#" + ack + "\n");
 			bw.flush();
@@ -186,7 +197,17 @@ public class MyServer extends Socket
 		System.out.println(
 				"SERVER: received \"" + filename + "\" saved successfully!");
 		bout.close();
+	}
 
+	public void timeout()
+	{
+		if ((System.nanoTime() - starttime) > timeout)
+		{
+			System.out.println("SERVER: TIMEOUT\n");
+			starttime = System.nanoTime();
+		}
+		else
+			return;
 	}
 
 	public static void main(String args[])
@@ -225,7 +246,6 @@ public class MyServer extends Socket
 						bw.flush();
 						return;
 					}
-
 					fin = new FileInputStream(file);
 					bin = new BufferedInputStream(fin);
 					oos = new ObjectOutputStream(os);
@@ -239,6 +259,5 @@ public class MyServer extends Socket
 			}
 			testserver.close();
 		}
-
 	}
 }
