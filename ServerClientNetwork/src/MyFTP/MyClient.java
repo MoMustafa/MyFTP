@@ -17,6 +17,7 @@ import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Random;
 import java.util.Scanner;
 
@@ -59,8 +60,8 @@ public class MyClient extends Socket
 	private long ack = 0;
 	private long starttime = 0;
 	private long timeout = 1000000;
-	
-	//CONTAINERS
+
+	// CONTAINERS
 	private header testheader = null;
 	private ArrayList<header> buffer = null;
 
@@ -81,7 +82,7 @@ public class MyClient extends Socket
 		bw = new BufferedWriter(osw);
 	}
 
-	private void messageexchange() throws IOException
+	private void communicate() throws IOException
 	{
 		while (true)
 		{
@@ -111,7 +112,8 @@ public class MyClient extends Socket
 		}
 	}
 
-	private void sendfile(File file) throws IOException, NoSuchAlgorithmException
+	private void sendfile(File file)
+			throws IOException, NoSuchAlgorithmException
 	{
 		System.out.println("CLIENT: Sending " + filename);
 
@@ -121,7 +123,7 @@ public class MyClient extends Socket
 		filelen = file.length();
 		sequence = (long) rand.nextInt(Integer.SIZE - 1) + 1;
 		endsequence = sequence + filelen;
-		
+
 		buffer = new ArrayList<header>();
 
 		starttime = System.nanoTime();
@@ -141,12 +143,15 @@ public class MyClient extends Socket
 			packet = new byte[size];
 			bin.read(packet, 0, size);
 			testheader = new header(packet, sequence, checksum);
-			System.out.println("CLIENT: Sending packet# " + testheader.num);
+
+			buffer.add(testheader);
+
+			System.out.println("CLIENT: Sending packet #" + testheader.num);
 			oos.writeObject(testheader);
 			if ((message = br.readLine()) != null)
 			{
 				System.out.println(
-						"\t\t\t\t\tCLIENT: From Server \"" + message + "\"");
+						"\t\t\t\t\tCLIENT: From SERVER \"" + message + "\"");
 				timeout();
 			}
 		}
@@ -155,7 +160,7 @@ public class MyClient extends Socket
 		oos.writeObject(null);
 		if ((message = br.readLine()) != null)
 		{
-			System.out.println("SERVER: From Client \"" + message + "\"");
+			System.out.println("CLIENT: From SERVER \"" + message + "\"");
 		}
 		buffer.clear();
 	}
@@ -163,50 +168,89 @@ public class MyClient extends Socket
 	private void receivefile()
 			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
 	{
+		int drop = 0;
+		buffer = new ArrayList<header>();
 		while ((testheader = (header) ois.readObject()) != null)
 		{
+			drop++;
+
 			testchecksum = testheader.checksum;
 			bytesRead = testheader.payload.length;
-			
-			if (testheader.num + packetsize <= ack || ack == 0)
-				ack = testheader.num + packetsize;
 
-			bout.write(testheader.payload, 0, bytesRead);
+			if (drop != 3)
+			{
+				System.out
+						.println("CLIENT: Received packet #" + testheader.num);
+				buffer.add(testheader);
+				Collections.sort(buffer, header.compareheader);
+				if (testheader.num == ack || ack == 0)
+					ack = buffer.get(buffer.size() - 1).num + packetsize;
+				System.out.println(
+						"\t\t\t\t\tCLIENT: Sending to SERVER ACK " + ack);
+			}
 			bw.write("ACK " + ack + "\n");
 			bw.flush();
 		}
 		bout.flush();
+		for (header testheader : buffer)
+		{
+			bout.write(testheader.payload, 0, testheader.payload.length);
+		}
+		bout.close();
+		buffer.clear();
 
 		new ChecksumGen();
 		checksum = ChecksumGen.getChecksum("received " + filename);
 
 		if (checksum.equals(testchecksum))
 		{
-			bw.write("Checksum Matches");
+			bw.write("Checksum matches");
 			bw.flush();
 		}
 		else
 		{
-			bw.write("Checksum Doesn't Match");
+			bw.write("Checksum doesn't match");
 			bw.flush();
 		}
 		client.close();
 		System.out.println(
-				"CLIENT: Received \"" + filename + "\" saved successfully!");
+				"CLIENT: \"received " + filename + "\" saved successfully!");
 		bout.close();
 	}
 
-	public void timeout()
+	public void timeout() throws IOException
 	{
 		if ((System.nanoTime() - starttime) > timeout)
 		{
-			System.out.println("SERVER: TIMEOUT\n");
+			System.out.println("\t\t\tCLIENT: TIMEOUT\n");
 			starttime = System.nanoTime();
+
+			commandarr = message.split(" ", 2);
+
+			ack = Long.parseLong(commandarr[1]);
+			if ((ack - testheader.num) < 0)
+			{
+				for (header t : buffer)
+				{
+					if (t.num == ack)
+					{
+						System.out.println(
+								"CLIENT: Retransmitting packet # " + ack);
+						oos.writeObject(t);
+						if ((message = br.readLine()) != null)
+						{
+							System.out
+									.println("\t\t\t\t\tCLIENT: From SERVER \""
+											+ message + "\"");
+						}
+					}
+				}
+			}
 		}
 		else
 			return;
 	}
-	
+
 	public static void main(String args[])
 			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
 	{
@@ -217,10 +261,7 @@ public class MyClient extends Socket
 
 		MyClient testclient = new MyClient(serveraddress, port);
 
-		testclient.messageexchange();
-
-		System.out.println("CLIENT: back in main");
-
+		testclient.communicate();
 		if (command != null)
 		{
 			commandarr = command.split(" ", 2);
