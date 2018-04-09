@@ -16,6 +16,8 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.Scanner;
 
@@ -39,10 +41,12 @@ public class MyServer extends Socket
 	private static BufferedOutputStream bout;
 	private static ObjectInputStream ois;
 	private static ObjectOutputStream oos;
-	
+
 	// VARIABLES
 	private static int port;
 	private static int packetsize = 1000;
+	private static String testchecksum = null;
+	private static String checksum = null;
 	private static String message = null;
 	private static String filename = null;
 	private static String command = null;
@@ -54,10 +58,13 @@ public class MyServer extends Socket
 	private int size = 0;
 	private int bytesRead = 0;
 	private long ack = 0;
-	private header testheader= null;
-	
+
+	// CONTAINERS
+	private header testheader = null;
+	private ArrayList<header> buffer = null;
+
 	Random rand = new Random();
-	
+
 	public MyServer(int port) throws IOException
 	{
 		listener = new ServerSocket(port);
@@ -102,15 +109,20 @@ public class MyServer extends Socket
 		}
 	}
 
-	public void sendfile(File file) throws IOException
+	public void sendfile(File file) throws IOException, NoSuchAlgorithmException
 	{
 		System.out.println("CLIENT: Sending " + filename);
 
+		new ChecksumGen();
+		checksum = ChecksumGen.getChecksum(filename);
+
 		filelen = file.length();
-		sequence = (long)rand.nextInt(Integer.SIZE-1)+1;
+		sequence = (long) rand.nextInt(Integer.SIZE - 1) + 1;
 		System.out.println(sequence);
 		endsequence = sequence + filelen;
-		
+
+		buffer = new ArrayList<header>();
+
 		while (sequence != endsequence)
 		{
 			size = packetsize;
@@ -125,37 +137,60 @@ public class MyServer extends Socket
 			}
 			packet = new byte[size];
 			bin.read(packet, 0, size);
-			testheader = new header(packet, sequence);
+			testheader = new header(packet, sequence, checksum);
+			System.out.println("SERVER: Sending packet# " + testheader.num);
 			oos.writeObject(testheader);
 			if ((message = br.readLine()) != null)
 			{
-				System.out.println("CLIENT: From Server \"" + message + "\"");
+				System.out.println(
+						"\t\t\t\t\tSERVER: From Client \"" + message + "\"");
 			}
 		}
-		System.out.println(filename + " Sent Successfully to "
+		System.out.println("SERVER: " + filename + " Sent Successfully to "
 				+ server.getRemoteSocketAddress());
 		oos.writeObject(null);
+		if ((message = br.readLine()) != null)
+		{
+			System.out.println("SERVER: From Client \"" + message + "\"");
+		}
 	}
 
-	public void receivefile() throws IOException, ClassNotFoundException
+	public void receivefile()
+			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
 	{
 		while ((testheader = (header) ois.readObject()) != null)
 		{
+			testchecksum = testheader.checksum;
 			bytesRead = testheader.payload.length;
-			ack = testheader.num;
+			ack = testheader.num + packetsize;
 			bout.write(testheader.payload, 0, bytesRead);
 			bw.write("ACK#" + ack + "\n");
 			bw.flush();
 		}
 		bout.flush();
-		server.close();
 
-		System.out.println("\"received "+filename+"\" saved successfully!");
+		new ChecksumGen();
+		checksum = ChecksumGen.getChecksum("received " + filename);
+
+		if (checksum.equals(testchecksum))
+		{
+			bw.write("Checksum Matches");
+			bw.flush();
+		}
+		else
+		{
+			bw.write("Checksum Doesn't Match");
+			bw.flush();
+		}
+		server.close();
+		System.out.println(
+				"SERVER: received \"" + filename + "\" saved successfully!");
 		bout.close();
 
 	}
 
-	public static void main(String args[]) throws IOException, ClassNotFoundException
+	public static void main(String args[])
+			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
 	{
 		System.out.println("SERVER: Enter Port #:");
 		port = Integer.parseInt(scanner.nextLine());
