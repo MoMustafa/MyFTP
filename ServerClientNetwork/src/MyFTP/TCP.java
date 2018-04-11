@@ -26,24 +26,42 @@ public class TCP
 	private static final long timeout = 5000000;
 	private static long starttime = 0;
 
+	/*
+	 * This method first creates a buffer. Then it generates a checksum for the
+	 * file being sent. It also generates a random long int to be the starting
+	 * sequence. The randomly generated long int cannot be zero.
+	 * 
+	 * Then it checks the length of the file and calculates the last sequence
+	 * number.
+	 * 
+	 * Then it initiates the timer.
+	 * 
+	 * While the last sequence number is not reached the method keeps sending
+	 * packets to the receiver. Each packet has a byte array of a fixed maximum
+	 * size, a sequence number and the file's checksum.
+	 * 
+	 * When we reach the last packet, the number of bytes left may be less than
+	 * the packet size. So the byte array's size is adjusted accordingly.
+	 * 
+	 * Before being sent, the packet is added to the buffer. Then the packet is
+	 * sent and the method checks if timeout has occurred. Timeout is determined
+	 * by if the time elapsed since the starttime exceeds a certain
+	 * predetermined amount.
+	 * 
+	 * If timeout occurs, then the timeout method is called to check if a
+	 * retransmission is necessary.
+	 * 
+	 * Once all the packets have been sent, we send a null to indicate end of
+	 * transmission and the method waits for a response from the recipient to
+	 * see if the checksum of received file matches the checksum of the sent
+	 * file.
+	 */
 	public static void sendfileTCP(String filename, Socket socket)
 			throws IOException, NoSuchAlgorithmException
 	{
-
+		File file = new File(filename);
 		OutputStream os = socket.getOutputStream();
 		ObjectOutputStream oos = new ObjectOutputStream(os);
-		OutputStreamWriter osw = new OutputStreamWriter(os);
-		BufferedWriter bw = new BufferedWriter(osw);
-
-		File file = new File(filename);
-
-		if (!file.exists())
-		{
-			System.out.println(filename + " does not exist.");
-			bw.write(filename + " does not exist.");
-			bw.flush();
-			return;
-		}
 		InputStream is = socket.getInputStream();
 		InputStreamReader isr = new InputStreamReader(is);
 		BufferedReader br = new BufferedReader(isr);
@@ -85,19 +103,48 @@ public class TCP
 			if ((message = br.readLine()) != null)
 			{
 				System.out.println("\t\t\t\t\t\"" + message + "\"");
-				timeout(message, testheader.num, buffer, oos, socket);
+				if ((System.nanoTime() - starttime) > timeout)
+				{
+					timeout(message, testheader.num, buffer, oos, socket);
+				}
 			}
 		}
 		System.out.println("\"" + filename + "\" sent successfully to "
 				+ socket.getRemoteSocketAddress());
 		oos.writeObject(null);
 		if ((message = br.readLine()) != null)
-			System.out.println("\"" + message + "\"");
+			System.out.println("Recepient says: \"" + message + "\"");
 		bin.close();
 		buffer.clear();
-		// remember to check if flush is needed as done in the main method
 	}
 
+	/*
+	 * This method first creates a buffer. Then, as long as the sender is
+	 * non-null objects we keep reading. At each received packet, we add it to
+	 * the buffer and sort the buffer by sequence number.
+	 * 
+	 * Then we calculate the ack to be 1 packetsize greater than the sequence
+	 * number of the packet we just received.
+	 * 
+	 * To test that our retransmission works, we deliberately drop the 3rd
+	 * packet that we received.
+	 * 
+	 * If the packet just received has a sequence number not equal to the ack we
+	 * just sent, we do not update the ack any further and keep sending acks of
+	 * the missing packet. Once we receive the retransmission, we update our ack
+	 * to be 1 packet size greater than whatever the largest sequence number in
+	 * our buffer is.
+	 * 
+	 * For each iteration, we keep track of the packet's checksum as well.
+	 * 
+	 * After all packets have been received, we empty the buffer sequentially
+	 * and write into our file in that order.
+	 * 
+	 * After writing the new file, we call a method to generate that file's
+	 * checksum and check if the checksum matches that which was sent in the
+	 * packets. Then we reply to the sender with our result on the checksum
+	 * test.
+	 */
 	public static void receivefileTCP(String filename, Socket socket)
 			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
 	{
@@ -143,23 +190,37 @@ public class TCP
 
 		new ChecksumGen();
 		String checksum = ChecksumGen.getChecksum("received " + filename);
+		System.out.println("Testing Checksum");
 		if (checksum.equals(testchecksum))
 		{
-			bw.write("Checksum matches");
+			System.out.println("Checksum matches.");
+			bw.write("Checksum matches.");
 			bw.flush();
 		}
 		else
 		{
-			bw.write("Checksum doesn't match");
+
+			System.out.println("Checksum doesn't match.");
+			bw.write("Checksum doesn't match.");
 			bw.flush();
 		}
 		socket.close();
-		System.out
-				.println("\"received " + filename + "\" saved successfully from"
+		System.out.println(
+				"\"received " + filename + "\" saved successfully from "
 						+ socket.getRemoteSocketAddress());
 		bout.close();
 	}
 
+	/*
+	 * At every timeout, the method first resets the timer. Then it reads the
+	 * latest ack that was received. if the ack received is less than the
+	 * sequence number of the last packet that was sent, it searches the buffer
+	 * to find the packet with a sequence number matching the ack.
+	 * 
+	 * Once found, the method retransmits that missing packet and waits for a
+	 * reply from the recipient before exiting back to the method that called
+	 * it.
+	 */
 	public static void timeout(String message, long seq,
 			ArrayList<header> buffer, ObjectOutputStream oos, Socket socket)
 			throws IOException
@@ -167,30 +228,26 @@ public class TCP
 		InputStream is = socket.getInputStream();
 		InputStreamReader isr = new InputStreamReader(is);
 		BufferedReader br = new BufferedReader(isr);
-		if ((System.nanoTime() - starttime) > timeout)
-		{
-			System.out.println("\t\t\tTIMEOUT\n");
-			starttime = System.nanoTime();
 
-			String[] temp = message.split(" ", 2);
-			long ack = Long.parseLong(temp[1]);
-			if ((ack - seq) < 0)
+		System.out.println("\t\t\tTIMEOUT\n");
+		starttime = System.nanoTime();
+
+		String[] temp = message.split(" ", 2);
+		long ack = Long.parseLong(temp[1]);
+		if ((ack - seq) < 0)
+		{
+			for (header t : buffer)
 			{
-				for (header t : buffer)
+				if (t.num == ack)
 				{
-					if (t.num == ack)
+					System.out.println("Retransmitting packet #" + t.num);
+					oos.writeObject(t);
+					if ((message = br.readLine()) != null)
 					{
-						System.out.println("Retransmitting packet #" + t.num);
-						oos.writeObject(t);
-						if ((message = br.readLine()) != null)
-						{
-							System.out.println("\t\t\t\t\t\"" + message + "\"");
-						}
+						System.out.println("\t\t\t\t\t\"" + message + "\"");
 					}
 				}
 			}
 		}
-		else
-			return;
 	}
 }
