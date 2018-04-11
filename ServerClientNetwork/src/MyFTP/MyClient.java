@@ -34,6 +34,11 @@ public class MyClient extends Socket
 	private static String command = null;
 	private static String[] commandarr = null;
 
+	/*
+	 * Instantiates MyClient by using the user assigned port number and server
+	 * address. I/O Streams are also instantiated so that They are not
+	 * prematurely closed elsewhere in the code.
+	 */
 	public MyClient(String serveraddress, int port) throws IOException
 	{
 		System.out.println(
@@ -49,36 +54,78 @@ public class MyClient extends Socket
 		bw = new BufferedWriter(osw);
 	}
 
+	/*
+	 * Begins communication between server and client. On this client side, the
+	 * Client Socket initiates the communication, after which each side takes
+	 * turns writing replies. If any side sends "end" both sides begin to
+	 * terminate connection. If the client receives a message that begins with
+	 * "send" it exits communication mode And goes into sendfile() code.
+	 * 
+	 * If the server side sends a message that begins with "send" it exits
+	 * communication mode And goes into receivefile() mode. In both of those
+	 * cases, before exiting, we save the filename being requested or sent.
+	 * 
+	 * If the file does not exist, the client sends a reply saying so and waits
+	 * for the server to send a reply.
+	 */
 	private void communicate() throws IOException
 	{
+		boolean DNE = false;
+
 		while (true)
 		{
-			message = scanner.nextLine();
-			if (message.startsWith("send"))
+			if (!DNE)
 			{
-				String filename = (message.split(" ", 2))[1];
-				command = "receive " + filename;
+				message = scanner.nextLine();
+				if (message.startsWith("send"))
+				{
+					String filename = (message.split(" ", 2))[1];
+					command = "receive " + filename;
+				}
+				bw.write(message + "\n");
+				bw.flush();
 			}
-			bw.write(message + "\n");
-			bw.flush();
-
+			DNE = false;
 			if (message.equals("end")) break;
 
 			if ((message = br.readLine()) != null)
 			{
 				if (message.startsWith("send"))
 				{
-					command = message;
-					bw.write("end\n");
-					bw.flush();
-					break;
+					File file = new File((message.split(" ", 2))[1]);
+					if (!file.exists())
+					{
+						System.out.println(
+								"CLIENT: Server said \"" + message + "\"");
+						System.out.println(
+								"CLIENT: Telling Server file does not exist.");
+						bw.write("File does not exist. Try again.\n");
+						bw.flush();
+						DNE = true;
+					}
+					else
+					{
+						command = message;
+						bw.write("end\n");
+						bw.flush();
+						break;
+					}
 				}
-				System.out.println("CLIENT: Server said \"" + message + "\"");
+				if (!DNE)
+					System.out
+							.println("CLIENT: Server said \"" + message + "\"");
 				if (message.equals("end")) break;
 			}
 		}
 	}
 
+	/*
+	 * Main method requests port number and server address from user and creates
+	 * a MyClient object. Then the client goes into communicate() mode. When the
+	 * client exits the communicate mode, we check the command string to
+	 * Determine whether we need to send or receive, and what the filename is We
+	 * send the socket and filename as parameters to the appropriate methods.
+	 */
 	public static void main(String args[])
 			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
 	{
@@ -118,8 +165,7 @@ public class MyClient extends Socket
 				System.out.println("CLIENT: Got command to " + command);
 				new TCP();
 				TCP.sendfileTCP(filename, client);
-				os.flush();
-				client.close();
+
 				testclient.close();
 				return;
 			}
