@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
@@ -28,7 +29,7 @@ public class MyServer extends Socket
 	private static BufferedReader br;
 	private static BufferedWriter bw;
 
-	// VARIABLES
+	// VARIABLES//
 	private static int port;
 	private static String message = null;
 	private static String filename = null;
@@ -44,10 +45,14 @@ public class MyServer extends Socket
 	 */
 	public MyServer(int port) throws IOException
 	{
-		listener = new ServerSocket(port);
-		System.out.println("SERVER: Listening for clients on port "
-				+ listener.getLocalPort());
-		server = listener.accept();
+		while (true)
+		{
+			listener = new ServerSocket(port);
+			System.out.println("SERVER: Listening for clients on port "
+					+ listener.getLocalPort());
+			server = listener.accept();
+			break;
+		}
 		System.out.println(
 				"SERVER: connected to " + server.getRemoteSocketAddress());
 		is = server.getInputStream();
@@ -104,10 +109,15 @@ public class MyServer extends Socket
 				if (message.equals("end")) break;
 			}
 			message = scanner.nextLine();
-			if (message.startsWith("send"))
+			if (message.startsWith("sendTCP"))
 			{
 				String filename = (message.split(" ", 2))[1];
-				command = "receive " + filename;
+				command = "receiveTCP " + filename;
+			}
+			if (message.startsWith("sendUDP"))
+			{
+				String filename = (message.split(" ", 2))[1];
+				command = "receiveUDP " + filename;
 			}
 			bw.write(message + "\n");
 			bw.flush();
@@ -136,18 +146,28 @@ public class MyServer extends Socket
 			commandarr = command.split(" ", 2);
 			filename = commandarr[1];
 
-			if ((commandarr[0]).equals("receive"))
+			if ((commandarr[0]).equals("receiveTCP")
+					|| (commandarr[0]).equals("receiveUDP"))
 			{
 				System.out.println("SERVER: Going to receive file.");
-
-				new TCP();
-				TCP.receivefileTCP(filename, server);
-
-				testserver.close();
-				return;
+				if ((commandarr[0]).equals("receiveUDP"))
+				{
+					InetAddress address = InetAddress.getLocalHost();
+					new UDP(port, address);
+					UDP.receive(filename);
+					testserver.close();
+					return;
+				}
+				if ((commandarr[0]).equals("receiveTCP"))
+				{
+					new TCP();
+					TCP.receivefileTCP(filename, server);
+					testserver.close();
+					return;
+				}
 			}
-
-			if ((commandarr[0]).equals("send"))
+			if ((commandarr[0]).equals("sendTCP")
+					|| (commandarr[0]).equals("sendUDP"))
 			{
 				File file = new File(filename);
 				if (!file.exists())
@@ -161,11 +181,21 @@ public class MyServer extends Socket
 					return;
 				}
 				System.out.println("SERVER: Got command to " + command);
-				new TCP();
-				TCP.sendfileTCP(filename, server);
-
-				testserver.close();
-				return;
+				if ((commandarr[0]).equals("sendUDP"))
+				{
+					InetAddress address = InetAddress.getLocalHost();
+					new UDP(port, address);
+					UDP.send(filename);
+					testserver.close();
+					return;
+				}
+				if ((commandarr[0]).equals("sendTCP"))
+				{
+					new TCP();
+					TCP.sendfileTCP(filename, server);
+					testserver.close();
+					return;
+				}
 			}
 		}
 		testserver.close();

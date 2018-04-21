@@ -40,5 +40,4 @@ public class header implements Serializable
 			return (num1 - num2);
 		}
 	};
-
 }
