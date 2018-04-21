@@ -23,7 +23,7 @@ import java.util.Random;
 public class TCP
 {
 	private static final int packetsize = 1000;
-	private static final long timeout = 5000000;
+	private static final long timeout = 500000000;
 	private static long starttime = 0;
 
 	/*
@@ -148,6 +148,7 @@ public class TCP
 	public static void receivefileTCP(String filename, Socket socket)
 			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
 	{
+		System.out.println("In RECEIVE TCP");
 		FileOutputStream fout = new FileOutputStream("received " + filename);
 		BufferedOutputStream bout = new BufferedOutputStream(fout);
 		InputStream is = socket.getInputStream();
@@ -199,7 +200,6 @@ public class TCP
 		}
 		else
 		{
-
 			System.out.println("Checksum doesn't match.");
 			bw.write("Checksum doesn't match.");
 			bw.flush();
