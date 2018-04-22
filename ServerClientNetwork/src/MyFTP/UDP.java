@@ -10,55 +10,50 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.ArrayList;
+import java.util.Scanner;
 
 public class UDP
 {
 	private static DatagramSocket udpSocket;
-	private static InetAddress address;
 	private static int port;
 	private static int packetsize = 1000;
 
-	public UDP(int p, InetAddress addr) throws SocketException
+	public UDP(int p) throws SocketException
 	{
-		address = addr;
 		port = p;
 	}
 
 	public static void receive(String filename) throws IOException
 	{
 		udpSocket = new DatagramSocket(port);
-		
+		System.out.println("IP Address of Receiver: "+InetAddress.getLocalHost());
 		FileOutputStream fout = new FileOutputStream("received " + filename);
 		BufferedOutputStream bout = new BufferedOutputStream(fout);
-		
-		ArrayList <byte[]> tempbuffer = new ArrayList <byte[]>();
-		
+
+		long starttime = System.nanoTime();
 		while (true)
 		{
+			if ((System.nanoTime() - starttime) > 1000000)
+				return;
 			byte[] buffer = new byte[packetsize];
 			DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
 			udpSocket.receive(packet);
 			System.out.println("received data");
-			
+			bout.write(packet.getData(), 0, packet.getData().length);
+
 			String quote = new String(buffer, 0, packet.getLength());
-			if(quote.equals("end"))
-				break;
-			
-			tempbuffer.add(packet.getData());
 		}
-		
-		for(int i = 0; i<tempbuffer.size(); i++)
-			bout.write(tempbuffer.get(i), 0, tempbuffer.get(i).length);
-		
-		System.out.println("done");
 	}
 
-	public static void send(String filename) throws IOException
+	public static void send(String filename, InetAddress address)
+			throws IOException
 	{
+		Scanner scanner = new Scanner(System.in);
 		udpSocket = new DatagramSocket();
-		
+		System.out.println("Enter destination IP: ");
+		String addr = scanner.nextLine();
+		address = InetAddress.getByName(addr);
 		File file = new File(filename);
 		FileInputStream fin = new FileInputStream(file);
 		BufferedInputStream bin = new BufferedInputStream(fin);
@@ -83,7 +78,9 @@ public class UDP
 			System.out.println("sent packet");
 		}
 		String end = "end";
-		udpSocket.send(new DatagramPacket(end.getBytes(), end.length(), address, port));
+		udpSocket.send(new DatagramPacket(end.getBytes(), end.length(), address,
+				port));
+		System.out.println("Ending");
 		bin.close();
 	}
 }
