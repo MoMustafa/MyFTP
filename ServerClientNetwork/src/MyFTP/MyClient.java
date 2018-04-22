@@ -151,12 +151,11 @@ public class MyClient extends Socket
 			if ((commandarr[0]).equals("receiveTCP")
 					|| (commandarr[0]).equals("receiveUDP"))
 			{
-				
+
 				System.out.println("CLIENT: Going to receive file.");
 				if ((commandarr[0]).equals("receiveUDP"))
 				{
-					InetAddress address = InetAddress.getLocalHost();
-					new UDP(port, address);
+					new UDP(port);
 					UDP.receive(filename);
 					testclient.close();
 					return;
@@ -186,9 +185,9 @@ public class MyClient extends Socket
 
 				if ((commandarr[0]).equals("sendUDP"))
 				{
-					InetAddress address = InetAddress.getLocalHost();
-					new UDP(port, address);
-					UDP.send(filename);
+					InetAddress address = null;
+					new UDP(port);
+					UDP.send(filename, address);
 					testclient.close();
 					return;
 				}
