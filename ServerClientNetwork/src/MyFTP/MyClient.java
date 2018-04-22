@@ -17,6 +17,7 @@ public class MyClient extends Socket
 {
 	// SERVER OBJECTS
 	private static Socket client = null;
+	private static InetAddress address = null;
 
 	// I/O OBJECTS
 	private static Scanner scanner = new Scanner(System.in);
@@ -37,11 +38,13 @@ public class MyClient extends Socket
 
 	/*
 	 * Instantiates MyClient by using the user assigned port number and server
-	 * address. I/O Streams are also instantiated so that They are not
-	 * prematurely closed elsewhere in the code.
+	 * address. Also prints out the client's IP address. I/O Streams are also
+	 * instantiated so that They are not prematurely closed elsewhere in the
+	 * code.
 	 */
 	public MyClient(String serveraddress, int port) throws IOException
 	{
+		System.out.println("IP Address: " + InetAddress.getLocalHost());
 		System.out.println(
 				"CLIENT: connecting to " + serveraddress + " on port " + port);
 		client = new Socket(serveraddress, port);
@@ -60,11 +63,11 @@ public class MyClient extends Socket
 	 * Client Socket initiates the communication, after which each side takes
 	 * turns writing replies. If any side sends "end" both sides begin to
 	 * terminate connection. If the client receives a message that begins with
-	 * "send" it exits communication mode And goes into sendfile() code.
+	 * "sendUDP" or "sendTCP" it exits communication mode.
 	 * 
-	 * If the server side sends a message that begins with "send" it exits
-	 * communication mode And goes into receivefile() mode. In both of those
-	 * cases, before exiting, we save the filename being requested or sent.
+	 * If the server side sends a message that begins with "sendUDP" and
+	 * "sendTCP" it exits communication mode. In both of those cases, before
+	 * exiting, we save the filename being requested or sent.
 	 * 
 	 * If the file does not exist, the client sends a reply saying so and waits
 	 * for the server to send a reply.
@@ -129,8 +132,7 @@ public class MyClient extends Socket
 	 * Main method requests port number and server address from user and creates
 	 * a MyClient object. Then the client goes into communicate() mode. When the
 	 * client exits the communicate mode, we check the command string to
-	 * Determine whether we need to send or receive, and what the filename is We
-	 * send the socket and filename as parameters to the appropriate methods.
+	 * Determine whether we need to send or receive, and what the filename is.
 	 */
 	public static void main(String args[])
 			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
@@ -185,7 +187,6 @@ public class MyClient extends Socket
 
 				if ((commandarr[0]).equals("sendUDP"))
 				{
-					InetAddress address = null;
 					new UDP(port);
 					UDP.send(filename, address);
 					testclient.close();

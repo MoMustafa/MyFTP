@@ -26,23 +26,29 @@ public class UDP
 	public static void receive(String filename) throws IOException
 	{
 		udpSocket = new DatagramSocket(port);
-		System.out.println("IP Address of Receiver: "+InetAddress.getLocalHost());
 		FileOutputStream fout = new FileOutputStream("received " + filename);
 		BufferedOutputStream bout = new BufferedOutputStream(fout);
 
-		long starttime = System.nanoTime();
+		//udpSocket.setSoTimeout(10000);
 		while (true)
 		{
-			if ((System.nanoTime() - starttime) > 1000000)
-				return;
 			byte[] buffer = new byte[packetsize];
 			DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
 
-			udpSocket.receive(packet);
-			System.out.println("received data");
-			bout.write(packet.getData(), 0, packet.getData().length);
-
-			String quote = new String(buffer, 0, packet.getLength());
+			//while (true)
+			//{
+				//try
+				//{
+					udpSocket.receive(packet);
+					System.out.println("received data");
+					bout.write(packet.getData(), 0, packet.getData().length);
+				//} catch (SocketTimeoutException e)
+				//{
+					//System.out.println("Exiting to main");
+					//bout.close();
+					//return;
+				//}
+			//}
 		}
 	}
 
@@ -51,9 +57,7 @@ public class UDP
 	{
 		Scanner scanner = new Scanner(System.in);
 		udpSocket = new DatagramSocket();
-		System.out.println("Enter destination IP: ");
-		String addr = scanner.nextLine();
-		address = InetAddress.getByName(addr);
+		scanner.close();
 		File file = new File(filename);
 		FileInputStream fin = new FileInputStream(file);
 		BufferedInputStream bin = new BufferedInputStream(fin);

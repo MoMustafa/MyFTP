@@ -19,6 +19,7 @@ public class MyServer extends Socket
 	// SERVER OBJECTS
 	private static ServerSocket listener = null;
 	private static Socket server = null;
+	private static InetAddress address = null;
 
 	// I/O OBJECTS
 	private static Scanner scanner = new Scanner(System.in);
@@ -37,20 +38,23 @@ public class MyServer extends Socket
 	private static String[] commandarr = null;
 
 	/*
-	 * Instantiates MyServer by using the user assigned port number.
-	 * ServerSocket Object listens for a connection by a client at the assigned
-	 * port then Socket object is returned when the listener accepts a
-	 * connection. I/O Streams are also instantiated so that they are not
-	 * prematurely closed elsewhere in the code.
+	 * Instantiates MyServer by using the user assigned port number. Also prints
+	 * out the server's IP address. ServerSocket Object listens for a connection
+	 * by a client at the assigned port then Socket object is returned when the
+	 * listener accepts a connection. I/O Streams are also instantiated so that
+	 * they are not prematurely closed elsewhere in the code.
 	 */
 	public MyServer(int port) throws IOException
 	{
+		System.out.println("IP Address: " + InetAddress.getLocalHost());
+		address = InetAddress.getLocalHost();
 		while (true)
 		{
 			listener = new ServerSocket(port);
 			System.out.println("SERVER: Listening for clients on port "
 					+ listener.getLocalPort());
 			server = listener.accept();
+
 			break;
 		}
 		System.out.println(
@@ -68,12 +72,11 @@ public class MyServer extends Socket
 	 * socket first waits for the client to initiate communication After which
 	 * each side takes turns writing replies. If any side sends "end" both sides
 	 * begin to terminate connection. If the server receives a message that
-	 * begins with "send" it exits communication mode And goes into sendfile()
-	 * mode.
+	 * begins with "sendUDP" or "sendTCP" it exits communication mode.
 	 * 
-	 * If the server side sends a message that begins with "send" it exits
-	 * communication mode And goes into receivefile() mode. In both of those
-	 * cases, before exiting, we save the filename being requested or sent.
+	 * If the server side sends a message that begins with "sendUDP" or
+	 * "sendTCP" it exits communication mode. In both of those cases, before
+	 * exiting, we save the filename being requested or sent.
 	 * 
 	 * If the file does not exist, the server sends a reply saying so and waits
 	 * for the client to send a reply.
@@ -129,8 +132,8 @@ public class MyServer extends Socket
 	 * Main method requests port number from user and creates a MyServer object.
 	 * Then the server immediately goes into communicate() mode. When the server
 	 * exits the communicate mode, we check the command string to determine
-	 * whether we need to send or receive, and what the filename is we send the
-	 * socket and filename as parameters to the appropriate methods.
+	 * whether we need to send or receive, what protocol to use, and what the
+	 * filename is.
 	 */
 	public static void main(String args[])
 			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
@@ -182,7 +185,6 @@ public class MyServer extends Socket
 				System.out.println("SERVER: Got command to " + command);
 				if ((commandarr[0]).equals("sendUDP"))
 				{
-					InetAddress address = null;
 					new UDP(port);
 					UDP.send(filename, address);
 					testserver.close();
