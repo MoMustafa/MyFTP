@@ -152,8 +152,7 @@ public class MyServer extends Socket
 				System.out.println("SERVER: Going to receive file.");
 				if ((commandarr[0]).equals("receiveUDP"))
 				{
-					InetAddress address = InetAddress.getLocalHost();
-					new UDP(port, address);
+					new UDP(port);
 					UDP.receive(filename);
 					testserver.close();
 					return;
@@ -183,9 +182,9 @@ public class MyServer extends Socket
 				System.out.println("SERVER: Got command to " + command);
 				if ((commandarr[0]).equals("sendUDP"))
 				{
-					InetAddress address = InetAddress.getLocalHost();
-					new UDP(port, address);
-					UDP.send(filename);
+					InetAddress address = null;
+					new UDP(port);
+					UDP.send(filename, address);
 					testserver.close();
 					return;
 				}
