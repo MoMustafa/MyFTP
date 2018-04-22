@@ -46,8 +46,9 @@ public class MyServer extends Socket
 	 */
 	public MyServer(int port) throws IOException
 	{
-		System.out.println("IP Address: " + InetAddress.getLocalHost());
 		address = InetAddress.getLocalHost();
+		System.out.println("IP Address: " + address);
+		
 		while (true)
 		{
 			listener = new ServerSocket(port);
@@ -163,7 +164,7 @@ public class MyServer extends Socket
 				if ((commandarr[0]).equals("receiveTCP"))
 				{
 					new TCP();
-					TCP.receivefileTCP(filename, server);
+					TCP.receive(filename, server);
 					testserver.close();
 					return;
 				}
@@ -193,7 +194,7 @@ public class MyServer extends Socket
 				if ((commandarr[0]).equals("sendTCP"))
 				{
 					new TCP();
-					TCP.sendfileTCP(filename, server);
+					TCP.send(filename, server);
 					testserver.close();
 					return;
 				}
