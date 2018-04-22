@@ -44,7 +44,8 @@ public class MyClient extends Socket
 	 */
 	public MyClient(String serveraddress, int port) throws IOException
 	{
-		System.out.println("IP Address: " + InetAddress.getLocalHost());
+		address = InetAddress.getLocalHost();
+		System.out.println("IP Address: " + address);
 		System.out.println(
 				"CLIENT: connecting to " + serveraddress + " on port " + port);
 		client = new Socket(serveraddress, port);
@@ -165,7 +166,7 @@ public class MyClient extends Socket
 				if ((commandarr[0]).equals("receiveTCP"))
 				{
 					new TCP();
-					TCP.receivefileTCP(filename, client);
+					TCP.receive(filename, client);
 					testclient.close();
 					return;
 				}
@@ -195,7 +196,7 @@ public class MyClient extends Socket
 				if ((commandarr[0]).equals("sendTCP"))
 				{
 					new TCP();
-					TCP.sendfileTCP(filename, client);
+					TCP.send(filename, client);
 					testclient.close();
 					return;
 				}

@@ -56,7 +56,7 @@ public class TCP
 	 * see if the checksum of received file matches the checksum of the sent
 	 * file.
 	 */
-	public static void sendfileTCP(String filename, Socket socket)
+	public static void send(String filename, Socket socket)
 			throws IOException, NoSuchAlgorithmException
 	{
 		File file = new File(filename);
@@ -145,11 +145,11 @@ public class TCP
 	 * packets. Then we reply to the sender with our result on the checksum
 	 * test.
 	 */
-	public static void receivefileTCP(String filename, Socket socket)
+	public static void receive(String filename, Socket socket)
 			throws IOException, ClassNotFoundException, NoSuchAlgorithmException
 	{
 		System.out.println("In RECEIVE TCP");
-		FileOutputStream fout = new FileOutputStream("received " + filename);
+		FileOutputStream fout = new FileOutputStream("receivedTCP " + filename);
 		BufferedOutputStream bout = new BufferedOutputStream(fout);
 		InputStream is = socket.getInputStream();
 		ObjectInputStream ois = new ObjectInputStream(is);
@@ -190,7 +190,7 @@ public class TCP
 		buffer.clear();
 
 		new ChecksumGen();
-		String checksum = ChecksumGen.getChecksum("received " + filename);
+		String checksum = ChecksumGen.getChecksum("receivedTCP " + filename);
 		System.out.println("Testing Checksum");
 		if (checksum.equals(testchecksum))
 		{
